@@ -1,7 +1,7 @@
 {
   "name": "Local-Web-Capture",
-  "description": "Capture web content (articles, prices) from the user's localhost so requests originate from the user's own IP — used to reach geo-restricted or region-locked sites (Israeli news, Israeli e-commerce). Headless-first escalation ladder: webclaw → stealth → real-Chrome via bb-browser. Saves normalized output to ~/local-web-capture/ and supports capture+translate (Hebrew→English default, arbitrary pairs).",
-  "version": "0.2.0",
+  "description": "Capture web content (articles, prices) from the user's localhost so requests originate from the user's own IP — used to reach geo-restricted or region-locked sites (Israeli news, Israeli e-commerce). Headless-first escalation ladder: Scrapling (static → stealth → Playwright) → bb-browser for auth. Saves normalized output to ~/local-web-capture/ and supports capture+translate (Hebrew→English default, arbitrary pairs).",
+  "version": "0.3.0",
   "author": {
     "name": "Daniel Rosehill",
     "email": "public@danielrosehill.com",

@@ -1,80 +1,83 @@
 ---
 name: scrape-article
-description: Scrape an article from a URL via the user's localhost (preserves Israeli IP for geo-restricted sites) and save a clean markdown capture to ~/local-web-capture/articles/. Use when the user gives a URL and wants the article body saved, or says "capture this article", "scrape this", or references Israeli news sites (ynet, haaretz, n12, calcalist, timesofisrael, etc.) they want archived.
+description: Scrape an article from a URL via the user's localhost (preserves Israeli IP for geo-restricted sites) and save a clean markdown capture. Use when the user gives a URL and wants the article body saved, or says "capture this article", "scrape this", or references Israeli news sites (ynet, haaretz, n12, calcalist, timesofisrael, etc.).
 ---
 
 # scrape-article
 
-Capture a single article and save it as markdown with frontmatter to `~/local-web-capture/articles/YYYY/MM/`.
+Capture a single article and save it as markdown with frontmatter. Resolve save root per `reference/save-location.md` (project-local `<repo>/captures/articles/YYYY/MM/` preferred, else `~/local-web-capture/articles/YYYY/MM/`, `--out` overrides).
 
 ## Hard constraint
 
-Requests must originate from this machine. Do **not** route through a hosted reader (Jina, Firecrawl SaaS, ScrapingBee, etc.) — the whole point is that the user's Israeli IP is what unlocks the content.
+Requests must originate from this machine. Do **not** route through a hosted reader (Jina, Firecrawl SaaS, ScrapingBee, etc.).
 
-## Escalation ladder — stop at the first method that returns a real body
+## Escalation ladder — stop at the first rung that returns a real body
 
-Cheapest → most expensive. Never skip ahead unless `sites.yaml` says the domain is known-hard (then start at the right rung).
+All rungs are headless except Tier 3. Prefer speed: do not skip ahead unless `sites.yaml` marks the domain as known-hard.
 
-### Rung 1 — webclaw (headless, purpose-built)
-Primary path. Lightweight Rust extractor, LLM-optimized output.
+### Rung 1 — Scrapling `Fetcher` (static, fastest)
 
-**Validated syntax (webclaw 0.5.x):** URLs are positional arguments, not a subcommand. There is no `--output` flag — output goes to stdout by default, or pass `--output-dir <dir>` to write one file per URL. Subcommands are `bench`, `extractors`, `vertical`, `help` (not `extract`).
+Plain HTTP + lxml. No browser. Use this by default.
 
-```bash
-# stdout (preferred for piping/inspection)
-webclaw --format markdown "<url>"
+```python
+from scrapling.fetchers import Fetcher
 
-# with content-focused extraction (drops nav/sidebar boilerplate)
-webclaw --format markdown --only-main-content "<url>"
-
-# write to a directory (one file per URL, filename derived from URL path)
-webclaw --format markdown --output-dir "<dir>" "<url>"
-
-# browser impersonation when a site rejects the default profile
-webclaw --format markdown -b firefox "<url>"
+page = Fetcher.get(url, stealthy_headers=True, follow_redirects=True, timeout=20)
+# page.status, page.html_content, page.css("article"), page.markdown
 ```
 
-Useful flags for this skill:
+If `page.status` ≥ 400, body < 200 chars, or the main content looks like nav/boilerplate → escalate.
 
-| Flag | Purpose |
-|---|---|
-| `-f, --format {markdown,json,text,llm,html}` | Output format; default `markdown` |
-| `--only-main-content` | Extract only `<article>` / `<main>` content |
-| `--include "<sel>,..."` / `--exclude "<sel>,..."` | CSS selector include/exclude lists |
-| `--metadata` | Include title/author/date metadata alongside body |
-| `-b, --browser {chrome,firefox,safari-ios,random}` | Browser impersonation profile |
-| `-H, --header "Key: Val"` | Custom request header (repeatable) |
-| `--cookie "<str>"` / `--cookie-file <file>` | Pass cookies for gated content |
-| `-t, --timeout <secs>` | Request timeout; default 30 |
-| `--raw-html` | Bypass extraction, emit fetched HTML |
+### Rung 2 — Scrapling `StealthyFetcher` (Camoufox, anti-bot)
 
-Check exit code and body length. If body < 200 chars or mostly nav boilerplate → escalate.
+Headless. Use when Tier 1 hit 403, Cloudflare challenge, or empty body on a site that shouldn't be empty.
 
-### Rung 2 — lightpanda (headless, lighter JS)
-For sites that need a tiny bit of JS but not full Chromium.
+```python
+from scrapling.fetchers import StealthyFetcher
 
-### Rung 3 — stealth headless
-Only if the site blocks normal headless (captcha, 403, cloudflare challenge).
-Tools: camofox-browser, stealth-browser-mcp, obscura. Pick based on what's installed.
+page = StealthyFetcher.fetch(url, headless=True, network_idle=True, humanize=True)
+```
 
-### Rung 4 — authenticated real browser
-**Do not use from this skill.** If the site is paywalled or session-bound, stop and tell the user to run `scrape-authenticated` (Tier-3 skill using bb-browser). Do not silently save a login-wall as if it were the article.
+### Rung 2b — Scrapling `PlayWrightFetcher` (JS render, no stealth)
+
+Headless. Use when the page needs JS to populate content but is not bot-blocked.
+
+```python
+from scrapling.fetchers import PlayWrightFetcher
+
+page = PlayWrightFetcher.fetch(url, headless=True, network_idle=True)
+```
+
+### Rung 3 — authenticated real browser
+
+**Do not use from this skill.** If the page is paywalled or session-bound, stop and tell the user to run `scrape-authenticated` (uses bb-browser).
+
+### Backup paths (only if Scrapling fails on a specific domain)
+
+- `webclaw --format markdown --only-main-content "<url>"` — Rust CLI fallback for Tier 1.
+- Playwright MCP — fallback for Tier 2b.
+- `camofox-browser` / `stealth-browser-mcp` — fallback for Tier 2.
+
+Record the backup used in `sites.yaml` so future runs start at the right rung.
+
+## Extracting the body
+
+Scrapling returns an `Adaptor`. Prefer in this order:
+1. `page.css_first("article").markdown` (or `<main>`, or site-specific selector from `sites.yaml`).
+2. If that's empty or too short, try the whole document: `page.markdown`.
+3. Strip nav/footer/aside via `page.css("nav, footer, aside, script, style").remove()` before reading markdown.
+
+If the domain has a `selectors` entry in `sites.yaml`, use it with `auto_match=True` so it heals across DOM changes.
 
 ## Strategy cache — sites.yaml
 
-On each run:
 1. Parse URL → domain.
-2. Look up domain in `<capture-root>/sites.yaml` first (project-local override if present), then `~/local-web-capture/sites.yaml`. Use its recorded `strategy` as the starting rung.
-3. After a successful scrape, if the domain is new, propose adding it to the global `sites.yaml`.
+2. Look up domain in `<capture-root>/sites.yaml`, then `~/local-web-capture/sites.yaml`. Use recorded `strategy` (`static` | `stealth` | `playwright` | `auth`) as starting rung.
+3. After a successful scrape, if the domain is new or the rung differs, propose updating the global `sites.yaml`.
 
 ## Output
 
-Resolve the save root per `reference/save-location.md`:
-- Inside a git repo → `<repo_root>/captures/articles/YYYY/MM/`.
-- Otherwise → `~/local-web-capture/articles/YYYY/MM/`.
-- `--out <path>` overrides both.
-
-Filename: `YYYY-MM-DD--HHMM--<slug>--<shorthash>.md` (timestamp included so repeated captures of the same URL don't collide).
+Filename: `YYYY-MM-DD--HHMM--<slug>--<shorthash>.md`.
 
 ```markdown
 ---
@@ -85,8 +88,8 @@ author: <author or null>
 published_at: <ISO date or null>
 captured_at: <ISO now, Israel timezone>
 language: <detected ISO 639-1>
-extractor: webclaw | lightpanda | playwright | stealth-*
-rung: 1 | 2 | 3
+extractor: scrapling-static | scrapling-stealth | scrapling-playwright | webclaw | playwright-mcp
+rung: 1 | 2 | 2b | 3
 word_count: <int>
 ---
 

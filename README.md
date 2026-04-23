@@ -8,16 +8,18 @@ Cheapest method that works wins. Escalation ladder:
 
 | Rung | Method | Tool | When |
 |------|--------|------|------|
-| 1 | Headless, purpose-built | `webclaw` | Default. Server-rendered articles, simple prices. |
-| 2 | Headless, full JS | `lightpanda` / Playwright MCP | Rung 1 returned thin content. |
-| 3 | Headless, stealth | `camofox` / `stealth-browser-mcp` | Bot-blocked. |
-| 4 | Real Chrome, logged in | `bb-browser` | Paywalled / session-bound. |
+| 1 | Headless, static HTTP | Scrapling `Fetcher` | Default. Server-rendered articles, simple prices. |
+| 2 | Headless, stealth | Scrapling `StealthyFetcher` (Camoufox) | Bot-blocked / Cloudflare. |
+| 2b | Headless, JS render | Scrapling `PlayWrightFetcher` | Needs JS, no bot block. |
+| 3 | Real Chrome, logged in | `bb-browser` | Paywalled / session-bound. |
+
+Backups (installed, not default): `webclaw`, `lightpanda`, `camofox-browser`, `stealth-browser-mcp`, Playwright MCP.
 
 Per-domain choice is cached in `sites.yaml` so the right rung is picked on repeat captures.
 
 ## Skills
 
-- `setup-tools` — one-time install of webclaw, bb-browser, data dir seeding.
+- `setup-tools` — one-time install of Scrapling, bb-browser, data dir seeding.
 - `scrape-article` — Rungs 1–3, save markdown capture.
 - `scrape-authenticated` — Rung 4 only, real Chrome via bb-browser.
 - `scrape-price` — structured price snapshot for e-commerce URLs.
