@@ -1,6 +1,6 @@
 ---
 name: scrape-web-page
-description: General-purpose web page scraper via the user's localhost (preserves Israeli IP for geo-restricted sites). Handles any page that is NOT a clean article — SPAs, branch locators, product catalogs, search result pages, government portals, dashboards, API endpoints discovered via devtools, or anything requiring raw HTML, rendered DOM, network/XHR responses, or structured extraction. Supports scripted user interaction (click "load more", scroll, type into search, iterate a city dropdown) for sites that hide data behind UI actions — a naive "scrape this URL" will return nothing on those. Trigger phrases: "scrape this page", "dump the HTML", "find the API behind this page", "capture this SPA", "get all the X from this page", "extract the JSON", "scrape branch list / store list / catalog", "I had to click to load everything", any non-article URL. For clean article extraction use `scrape-article` instead.
+description: General-purpose web page scraper via the user's localhost (preserves Israeli IP for geo-restricted sites). Handles any page that is NOT a clean article — SPAs, branch locators, product catalogs, search result pages, government portals, dashboards, API endpoints discovered via devtools, or anything requiring raw HTML, rendered DOM, network/XHR responses, or structured extraction. Supports scripted user interaction (click "load more", scroll, type into search, iterate a city dropdown) for sites that hide data behind UI actions — a naive "scrape this URL" will return nothing on those. Canonical user invocation provides a triple: (URL, interactive target to click/type/scroll, data to extract) — the skill loads the URL, activates the target in a loop until it stops producing new content, then extracts the requested data. Trigger phrases: "scrape this page", "dump the HTML", "find the API behind this page", "capture this SPA", "get all the X from this page", "extract the JSON", "scrape branch list / store list / catalog", "load URL, click this, then extract that", "I had to click to load everything", any non-article URL. For clean article extraction use `scrape-article` instead.
 ---
 
 # scrape-web-page
@@ -31,7 +31,38 @@ Do not default to `rendered` — it is the slowest. Start at `raw` unless the us
 
 ## `interactive` mode — scripted user actions
 
-Use when the data only appears after the user does something. Typical recipes:
+Use when the data only appears after the user does something.
+
+### Preferred invocation: user supplies the triple
+
+The cleanest way to drive this mode is for the user to provide three things:
+
+1. **URL** — the page to load.
+2. **Interactive target** — the thing to click / type / scroll to reveal the data. A CSS selector is ideal; plain text ("the button labelled 'טען עוד'", "the city dropdown", "scroll to bottom") is fine — resolve it to a selector on the loaded page.
+3. **Data to extract** — what the user actually wants out ("all branch ids and their Hebrew names", "every row in the results table", "the price and product name of each card").
+
+Given that triple, the recipe is fixed:
+
+```
+load URL
+→ repeat: activate the interactive target, wait for new content
+  (stop when the target disappears, is disabled, or row count stops growing)
+→ once settled, extract the requested data from the final DOM
+→ save as JSON (with a sidecar raw HTML dump in case extraction needs tweaking)
+```
+
+Resolve the target by kind:
+
+- **Button / link** (pagination, "load more", "show all"): click in a loop until it's gone / disabled / row count plateaus.
+- **Dropdown / select**: enumerate `<option>` values, load each, concatenate+dedupe results.
+- **Search box**: `page.type(sel, query, delay=120)`, wait for suggestions, click the match.
+- **Scroll**: repeated `page.mouse.wheel` until `document.body.scrollHeight` stops growing.
+
+Always pair with `network` capture so you keep raw JSON payloads even if the DOM extraction is brittle.
+
+Echo back what you resolved before running: "Loading X, will click selector `Y` until it stops producing new rows, then extract `Z`." One-line confirmation, then proceed under auto mode.
+
+### Typical recipes
 
 ### Click-through "load more" / pagination
 
