@@ -38,12 +38,17 @@ Tools: camofox-browser, stealth-browser-mcp, obscura. Pick based on what's insta
 
 On each run:
 1. Parse URL → domain.
-2. Look up domain in `~/local-web-capture/sites.yaml`. Use its recorded `strategy` as the starting rung.
-3. After a successful scrape, if the domain is new, propose adding it to `sites.yaml` with the rung that worked.
+2. Look up domain in `<capture-root>/sites.yaml` first (project-local override if present), then `~/local-web-capture/sites.yaml`. Use its recorded `strategy` as the starting rung.
+3. After a successful scrape, if the domain is new, propose adding it to the global `sites.yaml`.
 
 ## Output
 
-Path: `~/local-web-capture/articles/YYYY/MM/YYYY-MM-DD--<slug>--<shorthash>.md`
+Resolve the save root per `reference/save-location.md`:
+- Inside a git repo → `<repo_root>/captures/articles/YYYY/MM/`.
+- Otherwise → `~/local-web-capture/articles/YYYY/MM/`.
+- `--out <path>` overrides both.
+
+Filename: `YYYY-MM-DD--HHMM--<slug>--<shorthash>.md` (timestamp included so repeated captures of the same URL don't collide).
 
 ```markdown
 ---

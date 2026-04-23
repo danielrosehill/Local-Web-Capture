@@ -27,7 +27,9 @@ Via the installed Playwright MCP:
 
 ## Output
 
-Path: `~/local-web-capture/prices/<domain>/YYYY-MM-DD--<product-slug>.json`
+Resolve save root per `reference/save-location.md` (project-local `<repo>/captures/` preferred; global `~/local-web-capture/` fallback; `--out` overrides).
+
+Path: `<root>/prices/<domain>/YYYY-MM-DD--HHMM--<product-slug>.json` (timestamp included so repeated snapshots of the same product accumulate history).
 
 ```json
 {

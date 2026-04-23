@@ -13,7 +13,7 @@ Scrape an article from localhost, then produce a translation alongside the origi
 2. **Detect or confirm source language.** Default assumption: source is Hebrew. If frontmatter `language` disagrees or the user specified otherwise, use that.
 3. **Pick target language.** Default target is English (`en`). User can override (`--to es`, "translate to French", etc.).
 4. **Translate.**
-5. **Save translation** to `~/local-web-capture/translations/YYYY/MM/YYYY-MM-DD--<slug>--<src>-<tgt>.md`.
+5. **Save translation** to `<capture-root>/translations/YYYY/MM/YYYY-MM-DD--HHMM--<slug>--<src>-<tgt>.md`. Resolve `<capture-root>` per `reference/save-location.md` (project-local preferred; global fallback).
 
 ## Translator choice
 
