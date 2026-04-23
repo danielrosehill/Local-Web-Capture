@@ -18,9 +18,35 @@ Cheapest → most expensive. Never skip ahead unless `sites.yaml` says the domai
 ### Rung 1 — webclaw (headless, purpose-built)
 Primary path. Lightweight Rust extractor, LLM-optimized output.
 
+**Validated syntax (webclaw 0.5.x):** URLs are positional arguments, not a subcommand. There is no `--output` flag — output goes to stdout by default, or pass `--output-dir <dir>` to write one file per URL. Subcommands are `bench`, `extractors`, `vertical`, `help` (not `extract`).
+
 ```bash
-webclaw extract "<url>" --format markdown --output -
+# stdout (preferred for piping/inspection)
+webclaw --format markdown "<url>"
+
+# with content-focused extraction (drops nav/sidebar boilerplate)
+webclaw --format markdown --only-main-content "<url>"
+
+# write to a directory (one file per URL, filename derived from URL path)
+webclaw --format markdown --output-dir "<dir>" "<url>"
+
+# browser impersonation when a site rejects the default profile
+webclaw --format markdown -b firefox "<url>"
 ```
+
+Useful flags for this skill:
+
+| Flag | Purpose |
+|---|---|
+| `-f, --format {markdown,json,text,llm,html}` | Output format; default `markdown` |
+| `--only-main-content` | Extract only `<article>` / `<main>` content |
+| `--include "<sel>,..."` / `--exclude "<sel>,..."` | CSS selector include/exclude lists |
+| `--metadata` | Include title/author/date metadata alongside body |
+| `-b, --browser {chrome,firefox,safari-ios,random}` | Browser impersonation profile |
+| `-H, --header "Key: Val"` | Custom request header (repeatable) |
+| `--cookie "<str>"` / `--cookie-file <file>` | Pass cookies for gated content |
+| `-t, --timeout <secs>` | Request timeout; default 30 |
+| `--raw-html` | Bypass extraction, emit fetched HTML |
 
 Check exit code and body length. If body < 200 chars or mostly nav boilerplate → escalate.
 
