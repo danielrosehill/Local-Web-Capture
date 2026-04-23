@@ -1,6 +1,6 @@
 ---
 name: scrape-web-page
-description: General-purpose web page scraper via the user's localhost (preserves Israeli IP for geo-restricted sites). Handles any page that is NOT a clean article — SPAs, branch locators, product catalogs, search result pages, government portals, dashboards, API endpoints discovered via devtools, or anything requiring raw HTML, rendered DOM, network/XHR responses, or structured extraction. Supports scripted user interaction (click "load more", scroll, type into search, iterate a city dropdown) for sites that hide data behind UI actions — a naive "scrape this URL" will return nothing on those. Canonical user invocation provides a triple: (URL, interactive target to click/type/scroll, data to extract) — the skill loads the URL, activates the target in a loop until it stops producing new content, then extracts the requested data. Trigger phrases: "scrape this page", "dump the HTML", "find the API behind this page", "capture this SPA", "get all the X from this page", "extract the JSON", "scrape branch list / store list / catalog", "load URL, click this, then extract that", "I had to click to load everything", any non-article URL. For clean article extraction use `scrape-article` instead.
+description: General-purpose web page scraper via the user's localhost (preserves Israeli IP for geo-restricted sites). Handles any page that is NOT a clean article — SPAs, branch locators, product catalogs, search result pages, government portals, dashboards, API endpoints discovered via devtools, or anything requiring raw HTML, rendered DOM, network/XHR responses, or structured extraction. Supports scripted user interaction (click "load more", scroll, type into search, iterate a city dropdown) for sites that hide data behind UI actions — a naive "scrape this URL" will return nothing on those. Always tries to identify and call an unauthenticated backend JSON API first — UI automation is the fallback, not the default. Canonical user invocation provides a triple: (URL, interactive target to click/type/scroll, data to extract) — the skill loads the URL, activates the target in a loop until it stops producing new content, then extracts the requested data. Trigger phrases: "scrape this page", "dump the HTML", "find the API behind this page", "capture this SPA", "get all the X from this page", "extract the JSON", "scrape branch list / store list / catalog", "load URL, click this, then extract that", "I had to click to load everything", any non-article URL. For clean article extraction use `scrape-article` instead.
 ---
 
 # scrape-web-page
@@ -10,6 +10,24 @@ Flexible scraper for arbitrary web pages. Unlike `scrape-article`, does not assu
 ## Hard constraint
 
 Requests must originate from this machine. Do **not** route through a hosted reader (Jina, Firecrawl SaaS, ScrapingBee, etc.). The whole reason this plugin exists is to use the user's Israeli IP.
+
+## API-first, UI as fallback
+
+Before reaching for any browser automation, try to identify and call the site's **backend API directly**. Most modern SPAs are a thin shell around a JSON API, and that API is usually reachable unauthenticated from the same origin — once you know the endpoint and any query params, a plain `Fetcher.get` (rung 1) replaces everything else.
+
+Workflow:
+
+1. Load the page once in `network` mode (Playwright with a response listener) and list every JSON endpoint it hits. Also watch for interactions (search, filter, paginate) that trigger additional endpoints — run them once, capture the URL templates.
+2. For each candidate endpoint, try calling it directly with `curl` or `Fetcher.get`. Confirm:
+   - It returns the real data unauthenticated (no session cookie / CSRF token required, or the required headers are static and copyable).
+   - It supports pagination / filtering via query params you can enumerate.
+   - It isn't rate-limited into uselessness.
+3. If yes → **record the endpoint in `sites.yaml` under `api_endpoints:` and use it going forward.** Skip browser automation entirely on future runs. This is dramatically faster, more reliable, and handles pagination without clicking.
+4. Only if the API is authenticated, signed, rate-limited, or non-existent → fall back to UI automation (`interactive` mode).
+
+Report both attempts in the output: "Tried API at `<url>` → <result>. Fell back to UI interaction because <reason>." This way the user can see whether the API route is worth pushing on (e.g. via a captured auth token) before accepting the slower UI path.
+
+Do not skip the API check because "this SPA probably needs Playwright." Check first — the check costs one page load.
 
 ## Pick a mode before you start
 
