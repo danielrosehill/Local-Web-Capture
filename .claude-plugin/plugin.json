@@ -8,9 +8,6 @@
     "url": "https://danielrosehill.com"
   },
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/danielrosehill/Local-Web-Capture"
-  },
+  "repository": "https://github.com/danielrosehill/Local-Web-Capture",
   "keywords": ["scraping", "web-capture", "georestricted", "israel", "translation", "local", "headless"]
 }
